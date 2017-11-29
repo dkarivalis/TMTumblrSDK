@@ -37,6 +37,34 @@ NSData *HMACSHA1(NSString *dataString, NSString *keyString);
     return auth.headerString;
 }
 
++ (NSURL *)signUrlWithQueryComponent:(NSURL *)URL method:(NSString *)method postParameters:(NSDictionary *)postParameters
+                               nonce:(NSString *)nonce consumerKey:(NSString *)consumerKey consumerSecret:(NSString *)consumerSecret
+                               token:(NSString *)token tokenSecret:(NSString *)tokenSecret timestamp:(NSString *)timestamp {
+    NSMutableDictionary *oauthParameters = [[NSMutableDictionary alloc] initWithDictionary:@{
+                                                                                              @"oauth_timestamp" : timestamp,
+                                                                                              @"oauth_nonce" : nonce,
+                                                                                              @"oauth_version" : @"1.0",
+                                                                                              @"oauth_signature_method" : @"HMAC-SHA1",
+                                                                                              @"oauth_consumer_key" : consumerKey,
+                                                                                              }];
+    if (token && token.length > 0)
+        oauthParameters[@"oauth_token"] = token;
+
+    NSDictionary *queryParameters = TMQueryStringToDictionary(URL.query);
+    NSString *baseURLString = [[URL absoluteString] componentsSeparatedByString:@"?"][0];
+    NSString *baseString = generateBaseString(baseURLString, method, oauthParameters, queryParameters, postParameters);
+    oauthParameters[@"oauth_signature"] = sign(baseString, consumerSecret, tokenSecret);
+
+    NSMutableArray *queryItems = [NSMutableArray array];
+    for (NSString *key in oauthParameters)
+        [queryItems addObject:[NSURLQueryItem queryItemWithName:key value:TMURLEncode(oauthParameters[key])]];
+
+    NSURLComponents *urlComponents = [[NSURLComponents alloc] initWithURL:URL resolvingAgainstBaseURL:true];
+    urlComponents.queryItems = queryItems;
+
+    return [urlComponents URL];
+}
+
 - (id)initWithURL:(NSURL *)URL method:(NSString *)method postParameters:(NSDictionary *)postParameters
             nonce:(NSString *)nonce consumerKey:(NSString *)consumerKey consumerSecret:(NSString *)consumerSecret
             token:(NSString *)token tokenSecret:(NSString *)tokenSecret {
